@@ -6,7 +6,7 @@
 
 **GitHub Pages（推荐，启用后获得固定可分享链接）：**
 
-> https://zzf-love.github.io/e-commerce-data-statistics-table/
+> https://zzf-love.github.io/E-commerce-data-statistics-table/
 
 启用方法（一次性，约 1 分钟生效）：
 1. 打开仓库 → **Settings** → 左侧 **Pages**
@@ -16,7 +16,7 @@
 
 **临时预览（无需任何配置）：**
 
-> https://htmlpreview.github.io/?https://github.com/zzf-love/e-commerce-data-statistics-table/blob/claude/eloquent-rubin-Nh2mC/index.html
+> https://htmlpreview.github.io/?https://github.com/zzf-love/E-commerce-data-statistics-table/blob/claude/eloquent-rubin-Nh2mC/index.html
 
 ## 功能
 
