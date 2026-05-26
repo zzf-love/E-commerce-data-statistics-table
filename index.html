@@ -1,0 +1,1067 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>品牌电商销售数据看板</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg:     #f4f6fa;
+    --panel:  #ffffff;
+    --ink:    #0f1e34;
+    --ink-2:  #2b3a55;
+    --muted:  #6b7990;
+    --line:   #e3e7ef;
+    --line-2: #eef1f6;
+    --navy:   #1c3252;
+    --navy-2: #284773;
+    --blue:   #2c5aa6;
+    --teal:   #0e7c8a;
+    --slate:  #64748b;
+    --amber:  #b45309;
+    --red:    #b1364a;
+    --green:  #1e7d5a;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font-family: "PingFang SC","Microsoft YaHei","Source Han Sans CN","Helvetica Neue",Arial,sans-serif;
+    color: var(--ink);
+    background: var(--bg);
+    font-size: 13px;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+
+  /* ---------- 顶栏 ---------- */
+  .topbar {
+    height: 56px;
+    background: var(--navy);
+    color: #fff;
+    display: flex; align-items: center;
+    padding: 0 24px;
+    gap: 16px;
+  }
+  .brand {
+    display: flex; align-items: center; gap: 10px;
+    font-weight: 600; letter-spacing: 0.04em; font-size: 14px;
+  }
+  .brand-mark {
+    width: 20px; height: 20px;
+    background: linear-gradient(135deg, #4f86d6 0%, #2c5aa6 60%, #142e5a 100%);
+    border-radius: 4px; position: relative;
+  }
+  .brand-mark::after {
+    content: ""; position: absolute; inset: 4px 4px auto auto;
+    width: 5px; height: 5px; background: #fff; border-radius: 50%;
+  }
+  .brand small { color: #aebcd6; font-weight: 400; margin-left: 8px; font-size: 11px; }
+
+  .controls {
+    margin-left: auto;
+    display: flex; gap: 8px; align-items: center;
+  }
+  .ctrl {
+    display: flex; align-items: center; gap: 6px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12);
+    color: #e7ecf5;
+    padding: 6px 10px;
+    border-radius: 5px;
+    font-size: 12px;
+  }
+  .ctrl label { color: #aebcd6; font-size: 11px; }
+  .ctrl select {
+    background: transparent; color: #fff; border: none; outline: none;
+    font: inherit; cursor: pointer;
+  }
+  .ctrl select option { background: var(--navy-2); color: #fff; }
+  .btn {
+    background: rgba(255,255,255,0.10);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.18);
+    padding: 6px 12px;
+    border-radius: 5px;
+    cursor: pointer;
+    font: inherit; font-size: 12px;
+  }
+  .btn:hover { background: rgba(255,255,255,0.18); }
+  .btn.primary {
+    background: #3a6fc6;
+    border-color: #3a6fc6;
+  }
+  .btn.primary:hover { background: #4f86d6; }
+
+  /* ---------- 卡片网格 ---------- */
+  .grid {
+    height: calc(100vh - 56px);
+    padding: 12px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-template-rows: repeat(2, 1fr);
+    gap: 12px;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 12px 14px 8px;
+    display: flex; flex-direction: column;
+    min-height: 0;
+  }
+  .card.span-2 { grid-column: span 2; }
+  .card.emph { border-color: #c9d6ec; box-shadow: 0 1px 0 #e6edf8 inset, 0 0 0 1px #e6edf8; }
+  .card-head {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 4px;
+  }
+  .card-title {
+    font-size: 12.5px; font-weight: 600; color: var(--ink);
+    letter-spacing: 0.02em;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .card-title .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--navy-2);
+  }
+  .card.emph .card-title .dot { background: var(--amber); }
+  .card-meta {
+    font-size: 11px; color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .card-body {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+  }
+  .card-body canvas { width: 100% !important; height: 100% !important; }
+
+  /* ---------- 数据管理抽屉 ---------- */
+  .scrim {
+    position: fixed; inset: 0;
+    background: rgba(15,30,52,0.42);
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.2s;
+    z-index: 50;
+  }
+  .scrim.open { opacity: 1; pointer-events: auto; }
+  .drawer {
+    position: fixed; top: 0; right: 0; bottom: 0;
+    width: 680px; max-width: 96vw;
+    background: #fff;
+    box-shadow: -8px 0 28px rgba(15,30,52,0.18);
+    transform: translateX(100%);
+    transition: transform 0.22s ease;
+    z-index: 51;
+    display: flex; flex-direction: column;
+  }
+  .drawer.open { transform: translateX(0); }
+  .drawer-head {
+    padding: 18px 22px;
+    border-bottom: 1px solid var(--line);
+    display: flex; align-items: center; gap: 12px;
+  }
+  .drawer-head h2 {
+    margin: 0; font-size: 15px; font-weight: 600; color: var(--ink);
+    letter-spacing: 0.02em;
+  }
+  .drawer-head .close {
+    margin-left: auto;
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: var(--line-2);
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+    color: var(--ink-2);
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .drawer-head .close:hover { background: var(--line); }
+  .drawer-bar {
+    padding: 12px 22px;
+    border-bottom: 1px solid var(--line);
+    display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+    background: #fafbfd;
+  }
+  .drawer-bar .small-btn {
+    background: #fff;
+    border: 1px solid var(--line);
+    color: var(--ink-2);
+    padding: 6px 11px;
+    border-radius: 5px;
+    cursor: pointer;
+    font: inherit; font-size: 12px;
+    transition: background 0.12s, border-color 0.12s;
+  }
+  .drawer-bar .small-btn:hover { background: var(--line-2); border-color: #c9d2e0; }
+  .drawer-bar .small-btn.danger { color: var(--red); }
+  .drawer-bar .hint {
+    color: var(--muted); font-size: 11px; margin-left: auto;
+  }
+  .drawer-body {
+    flex: 1; overflow-y: auto;
+    padding: 4px 22px 18px;
+  }
+  table.data-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-variant-numeric: tabular-nums;
+  }
+  table.data-table th {
+    text-align: left;
+    font-weight: 600;
+    color: var(--muted);
+    font-size: 11px;
+    padding: 10px 8px 8px;
+    border-bottom: 1px solid var(--line);
+    position: sticky; top: 0;
+    background: #fff;
+  }
+  table.data-table th:first-child { width: 90px; }
+  table.data-table th:last-child { width: 36px; }
+  table.data-table td {
+    padding: 4px 4px;
+    border-bottom: 1px solid var(--line-2);
+  }
+  table.data-table input {
+    width: 100%;
+    background: transparent;
+    border: 1px solid transparent;
+    padding: 6px 8px;
+    border-radius: 4px;
+    font: inherit;
+    font-size: 13px;
+    color: var(--ink);
+    outline: none;
+    font-variant-numeric: tabular-nums;
+  }
+  table.data-table input:hover {
+    background: #fafbfd;
+    border-color: var(--line);
+  }
+  table.data-table input:focus {
+    background: #fff;
+    border-color: var(--blue);
+    box-shadow: 0 0 0 3px rgba(44,90,166,0.12);
+  }
+  table.data-table input[type="text"] { color: var(--ink-2); font-weight: 500; }
+  table.data-table .row-del {
+    width: 26px; height: 26px;
+    border: none; background: transparent;
+    color: var(--muted);
+    cursor: pointer; border-radius: 50%;
+    font-size: 14px;
+  }
+  table.data-table .row-del:hover { background: #fde9ec; color: var(--red); }
+  .drawer-foot {
+    padding: 14px 22px;
+    border-top: 1px solid var(--line);
+    display: flex; gap: 10px; align-items: center;
+    background: #fafbfd;
+  }
+  .drawer-foot .status { color: var(--muted); font-size: 12px; }
+  .drawer-foot .spacer { flex: 1; }
+  .drawer-foot button {
+    padding: 8px 16px; border-radius: 5px; font: inherit; font-size: 13px;
+    cursor: pointer; border: 1px solid transparent;
+  }
+  .drawer-foot button.save {
+    background: var(--navy); color: #fff; border-color: var(--navy);
+  }
+  .drawer-foot button.save:hover { background: var(--navy-2); }
+  .drawer-foot button.cancel {
+    background: #fff; color: var(--ink-2); border-color: var(--line);
+  }
+  .drawer-foot button.cancel:hover { background: var(--line-2); }
+
+  .paste-overlay {
+    position: fixed; inset: 0;
+    background: rgba(15,30,52,0.42);
+    z-index: 60;
+    display: none; align-items: center; justify-content: center;
+  }
+  .paste-overlay.open { display: flex; }
+  .paste-box {
+    background: #fff;
+    border-radius: 10px;
+    width: 600px; max-width: 92vw;
+    padding: 22px;
+    box-shadow: 0 12px 32px rgba(15,30,52,0.3);
+  }
+  .paste-box h3 { margin: 0 0 6px; font-size: 14px; }
+  .paste-box p { margin: 0 0 12px; color: var(--muted); font-size: 12px; line-height: 1.55; }
+  .paste-box textarea {
+    width: 100%; height: 220px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 10px;
+    font: 12.5px/1.5 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    resize: vertical;
+    outline: none;
+  }
+  .paste-box textarea:focus { border-color: var(--blue); }
+  .paste-box .row { display: flex; gap: 8px; margin-top: 12px; }
+  .paste-box .row .spacer { flex: 1; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 30px;
+    transform: translateX(-50%) translateY(60px);
+    background: rgba(15,30,52,0.96); color: #fff;
+    padding: 10px 18px;
+    border-radius: 6px;
+    font-size: 13px;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.22s, transform 0.22s;
+    z-index: 70;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* 响应式 */
+  @media (max-width: 1400px) {
+    .grid { grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, minmax(260px, 1fr)); height: auto; min-height: calc(100vh - 56px); }
+    body { overflow: auto; }
+    .card.span-2 { grid-column: span 2; }
+  }
+  @media (max-width: 980px) {
+    .grid { grid-template-columns: repeat(2, 1fr); grid-template-rows: repeat(4, 280px); }
+    .card.span-2 { grid-column: span 2; }
+  }
+  @media (max-width: 640px) {
+    .grid { grid-template-columns: 1fr; grid-template-rows: repeat(7, 320px); }
+    .card.span-2 { grid-column: span 1; }
+    .controls .ctrl label { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-mark"></div>
+    品牌电商销售看板
+    <small>Sales Dashboard · 一屏总览</small>
+  </div>
+  <div class="controls">
+    <div class="ctrl">
+      <label>时间范围</label>
+      <select id="rangeSel">
+        <option value="all">全部 (2023-2025)</option>
+        <option value="2025">2025 年</option>
+        <option value="2024">2024 年</option>
+        <option value="2023">2023 年</option>
+        <option value="last12">最近 12 个月</option>
+      </select>
+    </div>
+    <button class="btn primary" id="manageBtn">⚙ 数据管理</button>
+    <button class="btn" id="exportBtn">⬇ 导出 CSV</button>
+  </div>
+</header>
+
+<main class="grid">
+  <!-- Row 1 -->
+  <section class="card">
+    <div class="card-head">
+      <div class="card-title"><span class="dot"></span>销售额趋势</div>
+      <div class="card-meta" id="m1"></div>
+    </div>
+    <div class="card-body"><canvas id="c1"></canvas></div>
+  </section>
+
+  <section class="card emph">
+    <div class="card-head">
+      <div class="card-title"><span class="dot"></span>同比增长 YoY</div>
+      <div class="card-meta" id="m_yoy"></div>
+    </div>
+    <div class="card-body"><canvas id="c_yoy"></canvas></div>
+  </section>
+
+  <section class="card emph">
+    <div class="card-head">
+      <div class="card-title"><span class="dot"></span>环比增长 MoM</div>
+      <div class="card-meta" id="m_mom"></div>
+    </div>
+    <div class="card-body"><canvas id="c_mom"></canvas></div>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <div class="card-title"><span class="dot"></span>年度对比（同月叠加）</div>
+      <div class="card-meta">销售额 · 按月</div>
+    </div>
+    <div class="card-body"><canvas id="c2"></canvas></div>
+  </section>
+
+  <!-- Row 2 -->
+  <section class="card span-2">
+    <div class="card-head">
+      <div class="card-title"><span class="dot"></span>净销售 vs 推广费用</div>
+      <div class="card-meta" id="m3"></div>
+    </div>
+    <div class="card-body"><canvas id="c3"></canvas></div>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <div class="card-title"><span class="dot"></span>投产比 ROI</div>
+      <div class="card-meta" id="m4"></div>
+    </div>
+    <div class="card-body"><canvas id="c4"></canvas></div>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <div class="card-title"><span class="dot"></span>推广费用占比（按年）</div>
+      <div class="card-meta">饼图</div>
+    </div>
+    <div class="card-body"><canvas id="c5"></canvas></div>
+  </section>
+</main>
+
+<!-- ============ 数据管理抽屉 ============ -->
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-head">
+    <h2>数据管理</h2>
+    <span style="color:var(--muted);font-size:12px;">编辑、增删每月数据 — 保存后存到本地浏览器</span>
+    <button class="close" id="drawerClose" aria-label="关闭">✕</button>
+  </div>
+  <div class="drawer-bar">
+    <button class="small-btn" id="addRowBtn">＋ 新增一行</button>
+    <button class="small-btn" id="pasteBtn">📋 从 Excel 粘贴</button>
+    <button class="small-btn" id="importBtn">📁 导入 CSV</button>
+    <input type="file" id="fileInput" accept=".csv,text/csv" style="display:none">
+    <button class="small-btn danger" id="resetBtn">↺ 重置为示例数据</button>
+    <span class="hint">单位：元</span>
+  </div>
+  <div class="drawer-body">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>月份</th>
+          <th>销售额</th>
+          <th>净销售额</th>
+          <th>推广费用</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+  <div class="drawer-foot">
+    <span class="status" id="status">—</span>
+    <span class="spacer"></span>
+    <button class="cancel" id="cancelBtn">取消</button>
+    <button class="save" id="saveBtn">保存并应用</button>
+  </div>
+</aside>
+
+<!-- ============ 粘贴框 ============ -->
+<div class="paste-overlay" id="pasteOverlay">
+  <div class="paste-box">
+    <h3>从 Excel 粘贴</h3>
+    <p>从 Excel/表格里选中 4 列（月份、销售额、净销售额、推广费用）复制，然后粘贴到下方框内。月份支持 <code>2025/01</code>、<code>2025-1</code>、<code>2025年1月</code> 等格式。</p>
+    <textarea id="pasteArea" placeholder="2025/01&#9;2780000&#9;2390800&#9;462000&#10;2025/02&#9;2120000&#9;1823200&#9;378000&#10;..."></textarea>
+    <div class="row">
+      <span class="status" id="pasteStatus" style="color:var(--muted);font-size:12px;align-self:center;">解析后会追加 / 覆盖到表格</span>
+      <span class="spacer"></span>
+      <button class="small-btn" id="pasteCancel">取消</button>
+      <button class="small-btn" id="pasteConfirm" style="background:var(--navy);color:#fff;border-color:var(--navy);">解析并填入</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   示例数据（初始值；用户改完会存到 localStorage）
+   ============================================================ */
+const DEMO_DATA = [
+  { time:"2023/01", 销售额:1850000, 净销售额:1591000, 推广费用:320000 },
+  { time:"2023/02", 销售额:1420000, 净销售额:1221200, 推广费用:268000 },
+  { time:"2023/03", 销售额:1680000, 净销售额:1444800, 推广费用:295000 },
+  { time:"2023/04", 销售额:1750000, 净销售额:1505000, 推广费用:305000 },
+  { time:"2023/05", 销售额:2150000, 净销售额:1849000, 推广费用:410000 },
+  { time:"2023/06", 销售额:3680000, 净销售额:3164800, 推广费用:720000 },
+  { time:"2023/07", 销售额:1980000, 净销售额:1702800, 推广费用:345000 },
+  { time:"2023/08", 销售额:2050000, 净销售额:1763000, 推广费用:360000 },
+  { time:"2023/09", 销售额:2280000, 净销售额:1960800, 推广费用:395000 },
+  { time:"2023/10", 销售额:2520000, 净销售额:2167200, 推广费用:460000 },
+  { time:"2023/11", 销售额:4850000, 净销售额:4171000, 推广费用:980000 },
+  { time:"2023/12", 销售额:3120000, 净销售额:2683200, 推广费用:580000 },
+
+  { time:"2024/01", 销售额:2280000, 净销售额:1960800, 推广费用:388000 },
+  { time:"2024/02", 销售额:1720000, 净销售额:1478000, 推广费用:312000 },
+  { time:"2024/03", 销售额:2050000, 净销售额:1763000, 推广费用:352000 },
+  { time:"2024/04", 销售额:2240000, 净销售额:1926400, 推广费用:378000 },
+  { time:"2024/05", 销售额:2680000, 净销售额:2304800, 推广费用:495000 },
+  { time:"2024/06", 销售额:4520000, 净销售额:3887200, 推广费用:855000 },
+  { time:"2024/07", 销售额:2380000, 净销售额:2046800, 推广费用:408000 },
+  { time:"2024/08", 销售额:2480000, 净销售额:2132800, 推广费用:430000 },
+  { time:"2024/09", 销售额:2780000, 净销售额:2390800, 推广费用:472000 },
+  { time:"2024/10", 销售额:3080000, 净销售额:2648800, 推广费用:548000 },
+  { time:"2024/11", 销售额:6120000, 净销售额:5263200, 推广费用:1180000 },
+  { time:"2024/12", 销售额:3850000, 净销售额:3311000, 推广费用:695000 },
+
+  { time:"2025/01", 销售额:2780000, 净销售额:2390800, 推广费用:462000 },
+  { time:"2025/02", 销售额:2120000, 净销售额:1823200, 推广费用:378000 },
+  { time:"2025/03", 销售额:2490000, 净销售额:2141400, 推广费用:422000 },
+  { time:"2025/04", 销售额:2720000, 净销售额:2339200, 推广费用:458000 },
+  { time:"2025/05", 销售额:3280000, 净销售额:2820800, 推广费用:598000 },
+  { time:"2025/06", 销售额:5480000, 净销售额:4712800, 推广费用:1020000 },
+  { time:"2025/07", 销售额:2880000, 净销售额:2476800, 推广费用:488000 },
+  { time:"2025/08", 销售额:3010000, 净销售额:2588600, 推广费用:512000 },
+  { time:"2025/09", 销售额:3380000, 净销售额:2906800, 推广费用:565000 },
+  { time:"2025/10", 销售额:3680000, 净销售额:3164800, 推广费用:642000 },
+  { time:"2025/11", 销售额:7280000, 净销售额:6260800, 推广费用:1380000 },
+  { time:"2025/12", 销售额:4520000, 净销售额:3887200, 推广费用:815000 }
+];
+
+const STORAGE_KEY = "salesDashboardData_v1";
+
+/* ---------- 加载 / 保存 ---------- */
+function loadData() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr) && arr.length) return arr.map(normalizeRow).filter(Boolean);
+    }
+  } catch (e) {}
+  return DEMO_DATA.map(d => ({...d}));
+}
+function saveData(arr) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(arr));
+}
+function normalizeRow(r) {
+  if (!r || !r.time) return null;
+  const t = String(r.time).trim();
+  // 接受 2025/01, 2025-1, 2025年1月 等
+  const m = t.match(/(\d{4})\D+(\d{1,2})/);
+  if (!m) return null;
+  const time = m[1] + '/' + m[2].padStart(2, '0');
+  const num = v => {
+    if (v == null || v === '') return 0;
+    return +String(v).replace(/[,，\s元¥￥]/g, '') || 0;
+  };
+  return {
+    time,
+    销售额: num(r.销售额 ?? r.sales ?? r['销售额']),
+    净销售额: num(r.净销售额 ?? r.net ?? r['净销售额']),
+    推广费用: num(r.推广费用 ?? r.ad ?? r['推广费用']),
+  };
+}
+
+/* ---------- 全局状态 ---------- */
+let SALES_DATA = loadData();
+let editingData = null;   // 抽屉里正在编辑的副本
+let state = { range: 'all' };
+let charts = {};
+
+const C = {
+  navy:'#1c3252', navy2:'#284773', blue:'#2c5aa6', blueLite:'#7aa3d8',
+  teal:'#0e7c8a', slate:'#64748b', amber:'#b45309', red:'#b1364a',
+  green:'#1e7d5a', grid:'#e8ecf3', text:'#2b3a55', muted:'#7886a0',
+};
+const YEAR_COLORS = [C.slate, C.teal, C.blue, C.amber];
+const fmt = v => {
+  if (v == null) return '—';
+  if (Math.abs(v) >= 1e8) return (v/1e8).toFixed(2)+'亿';
+  if (Math.abs(v) >= 1e4) return (v/1e4).toFixed(1)+'万';
+  return Math.round(v).toLocaleString();
+};
+
+Chart.defaults.font.family = '"PingFang SC","Microsoft YaHei","Helvetica Neue",sans-serif';
+Chart.defaults.font.size = 11;
+Chart.defaults.color = C.text;
+Chart.defaults.plugins.legend.labels.usePointStyle = true;
+Chart.defaults.plugins.legend.labels.boxWidth = 7;
+Chart.defaults.plugins.legend.labels.boxHeight = 7;
+Chart.defaults.plugins.legend.labels.padding = 10;
+Chart.defaults.plugins.legend.labels.font = { size: 11 };
+Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(15,30,52,0.95)';
+Chart.defaults.plugins.tooltip.titleColor = '#fff';
+Chart.defaults.plugins.tooltip.bodyColor = '#dde4ef';
+Chart.defaults.plugins.tooltip.padding = 9;
+Chart.defaults.plugins.tooltip.cornerRadius = 5;
+Chart.defaults.layout = { padding: { top: 4, right: 6, bottom: 0, left: 0 } };
+
+const moneyScales = () => ({
+  x: { grid: { display: false }, border: { display: false },
+       ticks: { color: C.muted, maxRotation: 0, autoSkipPadding: 14, font: { size: 10 } } },
+  y: { grid: { color: C.grid }, border: { display: false },
+       ticks: { color: C.muted, padding: 4, font: { size: 10 }, callback: v => fmt(v) },
+       beginAtZero: true },
+});
+const pctScales = () => ({
+  x: { grid: { display: false }, border: { display: false },
+       ticks: { color: C.muted, maxRotation: 0, autoSkipPadding: 14, font: { size: 10 } } },
+  y: { grid: { color: C.grid }, border: { display: false },
+       ticks: { color: C.muted, padding: 4, font: { size: 10 }, callback: v => v + '%' } },
+});
+
+function filteredData() {
+  // 保持时间排序
+  const sorted = [...SALES_DATA].sort((a,b) => a.time.localeCompare(b.time));
+  if (state.range === 'all') return sorted;
+  if (state.range === 'last12') return sorted.slice(-12);
+  return sorted.filter(d => d.time.startsWith(state.range));
+}
+
+/* ============================================================
+   渲染所有图表
+   ============================================================ */
+function renderAll() {
+  Object.values(charts).forEach(c => c && c.destroy());
+  charts = {};
+  const data = filteredData();
+  if (!data.length) return;
+
+  const byTime = Object.fromEntries(SALES_DATA.map(d => [d.time, d]));
+
+  /* ---- 1. 销售额趋势 ---- */
+  document.getElementById('m1').textContent =
+    `${data.length} 个月 · 合计 ￥${fmt(data.reduce((s,d)=>s+d.销售额,0))}`;
+  charts.c1 = new Chart(document.getElementById('c1'), {
+    type: 'line',
+    data: {
+      labels: data.map(d => d.time),
+      datasets: [{
+        label: '销售额',
+        data: data.map(d => d.销售额),
+        borderColor: C.blue,
+        backgroundColor: 'rgba(44,90,166,0.10)',
+        fill: true, tension: 0.32,
+        borderWidth: 2, pointRadius: 2,
+        pointBackgroundColor: '#fff', pointBorderColor: C.blue, pointBorderWidth: 1.2,
+        pointHoverRadius: 4,
+      }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: moneyScales(),
+      plugins: { legend: { display: false },
+                 tooltip: { callbacks: { label: c => '销售额：￥' + fmt(c.parsed.y) } } },
+    },
+  });
+
+  /* ---- 同比 YoY ---- */
+  const yoy = data.map(d => {
+    const [y,m] = d.time.split('/');
+    const prev = byTime[(+y-1)+'/'+m];
+    return prev && prev.销售额 ? (d.销售额 - prev.销售额) / prev.销售额 * 100 : null;
+  });
+  const yoyValid = yoy.filter(v => v != null);
+  document.getElementById('m_yoy').textContent =
+    yoyValid.length ? `平均 ${(yoyValid.reduce((s,v)=>s+v,0)/yoyValid.length).toFixed(1)}%` : '需要去年同月数据';
+  charts.c_yoy = new Chart(document.getElementById('c_yoy'), {
+    type: 'bar',
+    data: {
+      labels: data.map(d => d.time),
+      datasets: [{
+        label: '同比 YoY',
+        data: yoy,
+        backgroundColor: yoy.map(v => v == null ? '#d4dae6' : (v >= 0 ? C.blue : C.red)),
+        borderRadius: 2,
+        categoryPercentage: 0.78, barPercentage: 0.88,
+      }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: pctScales(),
+      plugins: { legend: { display: false },
+                 tooltip: { callbacks: { label: c => '同比：' + (c.parsed.y == null ? '—' : c.parsed.y.toFixed(1) + '%') } } },
+    },
+  });
+
+  /* ---- 环比 MoM ---- */
+  const sorted = [...SALES_DATA].sort((a,b) => a.time.localeCompare(b.time));
+  const sortedIdx = Object.fromEntries(sorted.map((d,i) => [d.time, i]));
+  const mom = data.map(d => {
+    const i = sortedIdx[d.time];
+    const before = i > 0 ? sorted[i-1] : null;
+    return before && before.销售额 ? (d.销售额 - before.销售额) / before.销售额 * 100 : null;
+  });
+  const momValid = mom.filter(v => v != null);
+  document.getElementById('m_mom').textContent =
+    momValid.length ? `平均 ${(momValid.reduce((s,v)=>s+v,0)/momValid.length).toFixed(1)}%` : '—';
+  charts.c_mom = new Chart(document.getElementById('c_mom'), {
+    type: 'bar',
+    data: {
+      labels: data.map(d => d.time),
+      datasets: [{
+        label: '环比 MoM',
+        data: mom,
+        backgroundColor: mom.map(v => v == null ? '#d4dae6' : (v >= 0 ? C.teal : C.amber)),
+        borderRadius: 2,
+        categoryPercentage: 0.78, barPercentage: 0.88,
+      }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: pctScales(),
+      plugins: { legend: { display: false },
+                 tooltip: { callbacks: { label: c => '环比：' + (c.parsed.y == null ? '—' : c.parsed.y.toFixed(1) + '%') } } },
+    },
+  });
+
+  /* ---- 年度对比叠加 ---- */
+  const years = [...new Set(SALES_DATA.map(d => d.time.slice(0,4)))].sort();
+  charts.c2 = new Chart(document.getElementById('c2'), {
+    type: 'line',
+    data: {
+      labels: ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'],
+      datasets: years.map((y, i) => {
+        const arr = Array(12).fill(null);
+        SALES_DATA.filter(d => d.time.startsWith(y)).forEach(d => {
+          arr[+d.time.slice(5,7) - 1] = d.销售额;
+        });
+        return {
+          label: y + '年',
+          data: arr,
+          borderColor: YEAR_COLORS[i % YEAR_COLORS.length],
+          backgroundColor: 'transparent',
+          borderWidth: i === years.length - 1 ? 2.4 : 1.6,
+          tension: 0.32,
+          pointRadius: 2,
+          pointBackgroundColor: YEAR_COLORS[i % YEAR_COLORS.length],
+          spanGaps: true,
+        };
+      }),
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: moneyScales(),
+      plugins: { legend: { position: 'top', align: 'end' },
+                 tooltip: { callbacks: { label: c => c.dataset.label + '：￥' + fmt(c.parsed.y) } } },
+    },
+  });
+
+  /* ---- 净销 vs 推广 ---- */
+  const totalNet = data.reduce((s,d) => s + d.净销售额, 0);
+  const totalAd = data.reduce((s,d) => s + d.推广费用, 0);
+  document.getElementById('m3').textContent =
+    `净销 ￥${fmt(totalNet)} · 推广 ￥${fmt(totalAd)} · 费销比 ${totalNet ? (totalAd/(totalNet+totalAd-totalNet)*100).toFixed(1) : 0}%`;
+  charts.c3 = new Chart(document.getElementById('c3'), {
+    type: 'bar',
+    data: {
+      labels: data.map(d => d.time),
+      datasets: [
+        { label: '净销售额', data: data.map(d => d.净销售额),
+          backgroundColor: C.navy2, borderRadius: 2,
+          categoryPercentage: 0.78, barPercentage: 0.88 },
+        { label: '推广费用', data: data.map(d => d.推广费用),
+          backgroundColor: C.amber, borderRadius: 2,
+          categoryPercentage: 0.78, barPercentage: 0.88 },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: moneyScales(),
+      plugins: { legend: { position: 'top', align: 'end' },
+                 tooltip: { callbacks: { label: c => c.dataset.label + '：￥' + fmt(c.parsed.y) } } },
+    },
+  });
+
+  /* ---- ROI ---- */
+  const roi = data.map(d => d.推广费用 > 0 ? d.净销售额 / d.推广费用 : 0);
+  const avg = roi.reduce((s,v)=>s+v,0) / (roi.length || 1);
+  document.getElementById('m4').textContent = `均值 ${avg.toFixed(2)}x`;
+  charts.c4 = new Chart(document.getElementById('c4'), {
+    type: 'line',
+    data: {
+      labels: data.map(d => d.time),
+      datasets: [
+        { label: 'ROI', data: roi,
+          borderColor: C.teal, backgroundColor: 'rgba(14,124,138,0.10)',
+          fill: true, tension: 0.3, borderWidth: 2,
+          pointBackgroundColor: '#fff', pointBorderColor: C.teal,
+          pointRadius: 2, pointBorderWidth: 1.2, pointHoverRadius: 4 },
+        { label: '均值', data: data.map(() => avg),
+          borderColor: C.slate, borderWidth: 1.2, borderDash: [5,4],
+          pointRadius: 0, fill: false },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: {
+        x: { grid: { display: false }, border: { display: false },
+             ticks: { color: C.muted, maxRotation: 0, autoSkipPadding: 14, font: { size: 10 } } },
+        y: { grid: { color: C.grid }, border: { display: false },
+             ticks: { color: C.muted, padding: 4, font: { size: 10 }, callback: v => v.toFixed(1)+'x' } },
+      },
+      plugins: { legend: { position: 'top', align: 'end' },
+                 tooltip: { callbacks: { label: c => c.dataset.label + '：' + c.parsed.y.toFixed(2) + 'x' } } },
+    },
+  });
+
+  /* ---- 推广占比饼 ---- */
+  const yearAd = {};
+  data.forEach(d => {
+    const k = d.time.slice(0,4);
+    yearAd[k] = (yearAd[k] || 0) + d.推广费用;
+  });
+  const adLabels = Object.keys(yearAd);
+  const adVals = adLabels.map(k => yearAd[k]);
+  const palette = [C.navy2, C.blue, C.teal, C.amber, C.slate];
+  charts.c5 = new Chart(document.getElementById('c5'), {
+    type: 'doughnut',
+    data: {
+      labels: adLabels.map(y => y + '年'),
+      datasets: [{
+        data: adVals,
+        backgroundColor: palette.slice(0, adLabels.length),
+        borderColor: '#fff', borderWidth: 2,
+      }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      cutout: '55%',
+      plugins: {
+        legend: { position: 'right', labels: { boxWidth: 9, boxHeight: 9, padding: 10, font: { size: 11 } } },
+        tooltip: {
+          callbacks: {
+            label: c => {
+              const total = adVals.reduce((s,v)=>s+v,0);
+              return c.label + '：￥' + fmt(c.parsed) + ' (' + (c.parsed/total*100).toFixed(1) + '%)';
+            },
+          },
+        },
+      },
+    },
+  });
+}
+
+/* ============================================================
+   数据管理抽屉
+   ============================================================ */
+const scrim = document.getElementById('scrim');
+const drawer = document.getElementById('drawer');
+const tbody = document.getElementById('tbody');
+const statusEl = document.getElementById('status');
+
+function openDrawer() {
+  editingData = SALES_DATA.map(r => ({...r}));
+  renderTable();
+  scrim.classList.add('open');
+  drawer.classList.add('open');
+}
+function closeDrawer() {
+  scrim.classList.remove('open');
+  drawer.classList.remove('open');
+}
+
+function renderTable() {
+  tbody.innerHTML = '';
+  editingData.forEach((row, idx) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><input type="text" data-i="${idx}" data-k="time" value="${row.time||''}" placeholder="2025/01"></td>
+      <td><input type="number" data-i="${idx}" data-k="销售额" value="${row.销售额||0}"></td>
+      <td><input type="number" data-i="${idx}" data-k="净销售额" value="${row.净销售额||0}"></td>
+      <td><input type="number" data-i="${idx}" data-k="推广费用" value="${row.推广费用||0}"></td>
+      <td><button class="row-del" data-del="${idx}" title="删除该行">✕</button></td>
+    `;
+    tbody.appendChild(tr);
+  });
+  updateStatus();
+}
+
+tbody.addEventListener('input', e => {
+  const t = e.target;
+  const i = +t.dataset.i, k = t.dataset.k;
+  if (Number.isNaN(i) || !k) return;
+  if (k === 'time') editingData[i][k] = t.value;
+  else editingData[i][k] = +t.value || 0;
+  updateStatus();
+});
+tbody.addEventListener('click', e => {
+  if (e.target.dataset.del != null) {
+    editingData.splice(+e.target.dataset.del, 1);
+    renderTable();
+  }
+});
+
+function updateStatus() {
+  const n = editingData.length;
+  const ok = editingData.every(r => /^\d{4}\/\d{2}$/.test(r.time));
+  statusEl.textContent = `${n} 行${ok?'':'（有月份格式异常，保存时会尝试自动修正）'}`;
+}
+
+document.getElementById('addRowBtn').addEventListener('click', () => {
+  // 默认填上一行月份的下一月
+  let nextTime = '';
+  if (editingData.length) {
+    const last = editingData[editingData.length-1].time;
+    const m = last.match(/(\d{4})\D+(\d{1,2})/);
+    if (m) {
+      let y = +m[1], mo = +m[2] + 1;
+      if (mo > 12) { mo = 1; y += 1; }
+      nextTime = y + '/' + String(mo).padStart(2,'0');
+    }
+  }
+  editingData.push({ time: nextTime, 销售额: 0, 净销售额: 0, 推广费用: 0 });
+  renderTable();
+  // 滚到底
+  const body = document.querySelector('.drawer-body');
+  body.scrollTop = body.scrollHeight;
+  const inputs = tbody.querySelectorAll(`input[data-i="${editingData.length-1}"]`);
+  if (inputs[0]) inputs[0].focus();
+});
+
+document.getElementById('resetBtn').addEventListener('click', () => {
+  if (confirm('确定要把表格恢复为示例数据吗？（保存后会替换你已有的数据）')) {
+    editingData = DEMO_DATA.map(d => ({...d}));
+    renderTable();
+  }
+});
+
+document.getElementById('saveBtn').addEventListener('click', () => {
+  const cleaned = editingData.map(normalizeRow).filter(Boolean);
+  // 合并同月：以最后一条为准
+  const map = new Map();
+  cleaned.forEach(r => map.set(r.time, r));
+  const final = [...map.values()].sort((a,b) => a.time.localeCompare(b.time));
+  if (!final.length) {
+    toast('请至少保留一行有效数据');
+    return;
+  }
+  SALES_DATA = final;
+  saveData(SALES_DATA);
+  closeDrawer();
+  renderAll();
+  toast(`已保存 ${final.length} 行数据`);
+});
+document.getElementById('cancelBtn').addEventListener('click', closeDrawer);
+document.getElementById('drawerClose').addEventListener('click', closeDrawer);
+scrim.addEventListener('click', closeDrawer);
+
+/* ---------- CSV 导入 ---------- */
+document.getElementById('importBtn').addEventListener('click', () => {
+  document.getElementById('fileInput').click();
+});
+document.getElementById('fileInput').addEventListener('change', e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    const rows = parseCSV(reader.result);
+    mergeIntoEditing(rows);
+    toast(`已导入 ${rows.length} 行`);
+  };
+  reader.readAsText(f, 'utf-8');
+  e.target.value = '';
+});
+function parseCSV(text) {
+  const lines = text.replace(/^\ufeff/, '').split(/\r?\n/).filter(l => l.trim());
+  if (!lines.length) return [];
+  // 检测分隔符
+  const sep = lines[0].includes('\t') ? '\t' : (lines[0].includes(',') ? ',' : /\s+/);
+  const header = lines[0].split(sep).map(s => s.trim());
+  const isHeader = header.some(h => /time|月|销售|推广|net|ad/i.test(h));
+  const startAt = isHeader ? 1 : 0;
+  // 列序：尝试按表头映射，否则按位置 0=time 1=销售额 2=净销售额 3=推广费用
+  const idx = isHeader ? mapHeader(header) : { time:0, 销售额:1, 净销售额:2, 推广费用:3 };
+  const out = [];
+  for (let i = startAt; i < lines.length; i++) {
+    const cells = lines[i].split(sep);
+    const r = normalizeRow({
+      time: cells[idx.time],
+      销售额: cells[idx.销售额],
+      净销售额: cells[idx.净销售额],
+      推广费用: cells[idx.推广费用],
+    });
+    if (r) out.push(r);
+  }
+  return out;
+}
+function mapHeader(h) {
+  const find = (...keys) => h.findIndex(x => keys.some(k => x.toLowerCase().includes(k.toLowerCase())));
+  return {
+    time: Math.max(0, find('time','月','日期','date')),
+    销售额: Math.max(1, find('销售额','sales','gmv') < 0 ? 1 : find('销售额','sales','gmv')),
+    净销售额: Math.max(2, find('净销','net') < 0 ? 2 : find('净销','net')),
+    推广费用: Math.max(3, find('推广','ad','广告') < 0 ? 3 : find('推广','ad','广告')),
+  };
+}
+function mergeIntoEditing(rows) {
+  if (!editingData) editingData = [];
+  const map = new Map(editingData.map(r => [r.time, r]));
+  rows.forEach(r => map.set(r.time, r));
+  editingData = [...map.values()].sort((a,b) => a.time.localeCompare(b.time));
+  renderTable();
+}
+
+/* ---------- 粘贴 ---------- */
+const pasteOverlay = document.getElementById('pasteOverlay');
+document.getElementById('pasteBtn').addEventListener('click', () => {
+  document.getElementById('pasteArea').value = '';
+  pasteOverlay.classList.add('open');
+  setTimeout(() => document.getElementById('pasteArea').focus(), 50);
+});
+document.getElementById('pasteCancel').addEventListener('click', () => pasteOverlay.classList.remove('open'));
+document.getElementById('pasteConfirm').addEventListener('click', () => {
+  const txt = document.getElementById('pasteArea').value;
+  if (!txt.trim()) { pasteOverlay.classList.remove('open'); return; }
+  const rows = parseCSV(txt);
+  if (!rows.length) {
+    document.getElementById('pasteStatus').textContent = '没解析出有效行，检查月份格式';
+    document.getElementById('pasteStatus').style.color = 'var(--red)';
+    return;
+  }
+  mergeIntoEditing(rows);
+  pasteOverlay.classList.remove('open');
+  toast(`已解析 ${rows.length} 行`);
+});
+
+/* ============================================================
+   主控件
+   ============================================================ */
+document.getElementById('manageBtn').addEventListener('click', openDrawer);
+document.getElementById('rangeSel').addEventListener('change', e => {
+  state.range = e.target.value;
+  renderAll();
+});
+
+document.getElementById('exportBtn').addEventListener('click', () => {
+  const data = filteredData();
+  const head = ['time','销售额','净销售额','推广费用','同比%','环比%','ROI'];
+  const byTime = Object.fromEntries(SALES_DATA.map(d => [d.time, d]));
+  const sorted = [...SALES_DATA].sort((a,b) => a.time.localeCompare(b.time));
+  const sortedIdx = Object.fromEntries(sorted.map((d,i) => [d.time, i]));
+  const rows = data.map(d => {
+    const [y,m] = d.time.split('/');
+    const prev = byTime[(+y-1)+'/'+m];
+    const i = sortedIdx[d.time];
+    const before = i > 0 ? sorted[i-1] : null;
+    const yoy = prev && prev.销售额 ? ((d.销售额 - prev.销售额)/prev.销售额*100).toFixed(2) : '';
+    const mom = before && before.销售额 ? ((d.销售额 - before.销售额)/before.销售额*100).toFixed(2) : '';
+    const roi = d.推广费用 > 0 ? (d.净销售额/d.推广费用).toFixed(2) : '';
+    return [d.time, d.销售额, d.净销售额, d.推广费用, yoy, mom, roi];
+  });
+  const csv = '\ufeff' + [head, ...rows].map(r => r.join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `销售数据_${state.range}_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+/* ---------- Toast ---------- */
+let toastTimer;
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+renderAll();
+</script>
+
+</body>
+</html>
