@@ -346,13 +346,7 @@
   <div class="controls">
     <div class="ctrl">
       <label>时间范围</label>
-      <select id="rangeSel">
-        <option value="all">全部 (2023-2025)</option>
-        <option value="2025">2025 年</option>
-        <option value="2024">2024 年</option>
-        <option value="2023">2023 年</option>
-        <option value="last12">最近 12 个月</option>
-      </select>
+      <select id="rangeSel"></select>
     </div>
     <button class="btn primary" id="manageBtn">⚙ 数据管理</button>
     <button class="btn" id="exportBtn">⬇ 导出 CSV</button>
@@ -610,10 +604,28 @@ function filteredData() {
   return sorted.filter(d => d.time.startsWith(state.range));
 }
 
+/* ---------- 时间范围下拉：根据数据动态生成 ---------- */
+function refreshRangeOptions() {
+  const sel = document.getElementById('rangeSel');
+  const years = [...new Set(SALES_DATA.map(d => d.time.slice(0,4)))].sort();
+  const allLabel = years.length
+    ? (years.length === 1 ? `全部 (${years[0]})` : `全部 (${years[0]}-${years[years.length-1]})`)
+    : '全部';
+  const opts = [`<option value="all">${allLabel}</option>`]
+    .concat(years.slice().reverse().map(y => `<option value="${y}">${y} 年</option>`))
+    .concat([`<option value="last12">最近 12 个月</option>`]);
+  sel.innerHTML = opts.join('');
+  // 保留当前选择；若已失效则回退到 all
+  const valid = ['all', 'last12', ...years];
+  if (!valid.includes(state.range)) state.range = 'all';
+  sel.value = state.range;
+}
+
 /* ============================================================
    渲染所有图表
    ============================================================ */
 function renderAll() {
+  refreshRangeOptions();
   Object.values(charts).forEach(c => c && c.destroy());
   charts = {};
   const data = filteredData();
